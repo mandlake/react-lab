@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route } from "react-router-dom";
 import TransitionTestPage from "./pages/TransitionTest";
+import OptimisticTest from "./pages/OptimisticTest";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           }
         />
         <Route path="/transitionTest" element={<TransitionTestPage />} />
+        <Route path="/optimisticTest" element={<OptimisticTest />} />
       </Routes>
     </HashRouter>
   );
