@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import TestPage from "./pages/TransitionTest";
+import TransitionTestPage from "./pages/TransitionTest";
 
 export default function App() {
   return (
@@ -16,7 +16,7 @@ export default function App() {
         />
 
         {/* localhost:5173/test 접속 시 테스트 페이지 렌더링 */}
-        <Route path="/transitionTest" element={<TestPage />} />
+        <Route path="/transitionTest" element={<TransitionTestPage />} />
       </Routes>
     </BrowserRouter>
   );
