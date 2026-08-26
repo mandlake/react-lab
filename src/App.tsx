@@ -1,11 +1,10 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import TransitionTestPage from "./pages/TransitionTest";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
-        {/* localhost:5173/ 접속 시 기존 메인 화면 유지 */}
         <Route
           path="/"
           element={
@@ -14,10 +13,8 @@ export default function App() {
             </div>
           }
         />
-
-        {/* localhost:5173/test 접속 시 테스트 페이지 렌더링 */}
         <Route path="/transitionTest" element={<TransitionTestPage />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
