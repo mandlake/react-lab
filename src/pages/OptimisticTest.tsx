@@ -1,56 +1,112 @@
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useState, useTransition } from "react";
 
-// 가상 서버 API (1.5초 딜레이)
+// 서버 상태 조회 (GET)
+async function fetchServerLikes(): Promise<number> {
+  const res = await fetch("/api/like");
+  const data = await res.json();
+  return data.likes;
+}
+
+// 좋아요 증가 요청 (POST)
 async function updateLikeOnServer(shouldFail: boolean): Promise<number> {
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  const response = await fetch("/api/like", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shouldFail }),
+  });
 
-  if (shouldFail) throw new Error("서버 통신 실패 (네트워크 에러)");
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || "서버 통신 실패");
+  }
 
-  return 1; // 1증가 성공
+  const data = await response.json();
+  return data.likes;
+}
+
+// 서버 및 클라이언트 상태 초기화 (DELETE)
+async function resetServerLikes(): Promise<number> {
+  const res = await fetch("/api/like", { method: "DELETE" });
+  const data = await res.json();
+  return data.likes;
 }
 
 export default function OptimisticTest() {
-  // 실제 서버 데이터 상태
   const [serverLikes, setServerLikes] = useState(10);
   const [shouldFail, setShouldFail] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  // useOptimistic 선언 (비동기 처리 동안 임시 상태를 계산하여 노출)
+  // 컴포넌트 마운트 시 서버의 실제 현재 수치와 동기화
+  useEffect(() => {
+    fetchServerLikes().then((likes) => setServerLikes(likes));
+  }, []);
+
+  // 낙관적 UI 훅 (다음 수치 치환)
   const [optimisticLikes, setOptimisticLikes] = useOptimistic(
     serverLikes,
-    (current: number, updateValue: number) => current + updateValue,
+    (_current: number, nextValue: number) => nextValue,
   );
 
   const handleLike = () => {
     setErrorMessage(null);
 
-    // useOptimistic은 Transition 또는 Form Action 내부에서 실행되어야 합니다.
+    // 현재 눈에 보이는 수치 + 1
+    const nextLikes = optimisticLikes + 1;
+
     startTransition(async () => {
-      // 1. 낙관적 UI 즉시 반영 (+1)
-      setOptimisticLikes(1);
+      // 1. UI 즉시 반영 (+1)
+      setOptimisticLikes(nextLikes);
 
       try {
-        // 2. 가상 서버 통신
-        await updateLikeOnServer(shouldFail);
-
-        // 3. 통신 성공 시 실제 서버 상태 확정
-        setServerLikes((prev) => prev + 1);
+        // 2. 실제 서버 통신
+        const updated = await updateLikeOnServer(shouldFail);
+        setServerLikes(updated);
       } catch (err) {
-        // 통신 실패 시 : 수동으로 숫자를 되돌리는 코드 (-1)가 전혀 없어도
-        // 비동기 작업이 끝나는 순간 React가 자동으로 serverLikes 기준(원래 숫자)으로 롤백합니다.
+        // 3. 실패 시 React가 자동으로 원래 serverLikes로 롤백
         setErrorMessage(err instanceof Error ? err.message : "오류 발생");
       }
     });
   };
 
+  // 발표 데모 시연용 10 리셋 함수
+  const handleReset = async () => {
+    setErrorMessage(null);
+    const resetValue = await resetServerLikes();
+    setServerLikes(resetValue);
+  };
+
   return (
     <div
-      style={{ padding: "20px", fontFamily: "sans-serif", maxWidth: "420px" }}
+      style={{ padding: "24px", fontFamily: "sans-serif", maxWidth: "420px" }}
     >
-      <h2>useOptimistic 테스트</h2>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <h2 style={{ margin: 0, fontSize: "20px" }}>
+          useOptimistic 실전 테스트
+        </h2>
+        <button
+          onClick={handleReset}
+          style={{
+            padding: "4px 10px",
+            fontSize: "12px",
+            background: "#f1f5f9",
+            border: "1px solid #cbd5e1",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          🔄 10으로 초기화
+        </button>
+      </div>
 
-      {/* 실패 시뮬레이션 토글 */}
+      {/* 500 에러 시뮬레이션 토글 */}
       <label
         style={{
           display: "flex",
@@ -65,38 +121,38 @@ export default function OptimisticTest() {
           checked={shouldFail}
           onChange={(e) => setShouldFail(e.target.checked)}
         />
-        <span>🚨 서버 API 요청 실패 시뮬레이션</span>
+        <span>🚨 서버 API 500 에러 시뮬레이션</span>
       </label>
 
       {/* 좋아요 카드 */}
       <div
         style={{
-          border: "1px solid #ddd",
-          borderRadius: "8px",
-          padding: "16px",
+          border: "1px solid #e2e8f0",
+          borderRadius: "10px",
+          padding: "18px",
           background: "#fafafa",
         }}
       >
         <div
-          style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "8px" }}
+          style={{ fontSize: "20px", fontWeight: "bold", marginBottom: "6px" }}
         >
           ❤️ 좋아요 수: {optimisticLikes}
         </div>
-        <p style={{ margin: "4px 0", fontSize: "13px", color: "#666" }}>
-          (실제 확정된 서버 상태: {serverLikes})
+        <p style={{ margin: "0 0 14px", fontSize: "13px", color: "#64748b" }}>
+          (실제 서버 확정 데이터: {serverLikes})
         </p>
 
         <button
           onClick={handleLike}
           style={{
-            marginTop: "12px",
-            padding: "8px 16px",
+            padding: "9px 18px",
             fontSize: "14px",
+            fontWeight: "600",
             cursor: "pointer",
-            background: "#0070f3",
+            background: "#2563eb",
             color: "#fff",
             border: "none",
-            borderRadius: "4px",
+            borderRadius: "6px",
           }}
         >
           👍 좋아요 누르기
@@ -108,10 +164,10 @@ export default function OptimisticTest() {
         <div
           style={{
             marginTop: "12px",
-            padding: "8px",
-            background: "#ffeef0",
-            color: "#d93025",
-            borderRadius: "4px",
+            padding: "10px",
+            background: "#fee2e2",
+            color: "#dc2626",
+            borderRadius: "6px",
             fontSize: "13px",
           }}
         >
